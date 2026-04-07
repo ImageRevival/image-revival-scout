@@ -680,7 +680,7 @@ function renderResults(items) {
           <span style="font-size:11px;color:var(--text3);">${item.condition}</span>
         </div>
         <div class="card-actions">
-          <button class="btn btn-sm btn-ghost" onclick="openOnEbay('${item.url}')">View on eBay ↗</button>
+          <a class="btn btn-sm btn-ghost" href="${item.url}" target="_blank" rel="noopener">View on eBay ↗</a>
           <button class="btn btn-sm ${watched?'btn-danger':'btn-watch'}" onclick="toggleWatch(${JSON.stringify(item).replace(/"/g,'&quot;')}, this)">
             ${watched ? '★ Watching' : '☆ Watch'}
           </button>
@@ -756,7 +756,7 @@ function renderWatchlist() {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
-          <button class="btn btn-sm btn-ghost" onclick="openOnEbay('${item.url}')">View on eBay ↗</button>
+          <a class="btn btn-sm btn-ghost" href="${item.url}" target="_blank" rel="noopener">View on eBay ↗</a>
           <button class="btn btn-sm btn-ghost" onclick="logFromWatch(${idx})">Log Purchase</button>
           <button class="btn btn-sm btn-danger" onclick="removeWatch(${idx})">Remove</button>
         </div>
@@ -1016,7 +1016,7 @@ function renderHibidResults(items) {
     const watched = onWatch.has(item.id);
     const premiumAmt = (item.currentBid * item.buyerPremium / 100).toFixed(2);
     return `<div class="listing-card">
-      <div class="thumb">${emoji}</div>
+      <div class="thumb">${item.img ? `<img src="${item.img}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius);">` : emoji}</div>
       <div>
         <div class="card-title">${item.title}</div>
         <div class="card-meta">
@@ -1025,7 +1025,7 @@ function renderHibidResults(items) {
           <span style="font-size:11px;color:var(--text3);">${item.auctionHouse}</span>
         </div>
         <div class="card-actions">
-          <button class="btn btn-sm btn-ghost" onclick="window.open('${item.url}','_blank')">View on HiBid ↗</button>
+          <a class="btn btn-sm btn-ghost" href="${item.url}" target="_blank" rel="noopener">View on HiBid ↗</a>
           <button class="btn btn-sm ${watched?'btn-danger':'btn-watch'}" onclick="toggleWatch(${JSON.stringify({...item, format:'Auction', price: item._totalCost, condition:'Estate Auction'}).replace(/"/g,'&quot;')}, this)">
             ${watched ? '★ Watching' : '☆ Watch'}
           </button>
@@ -1090,72 +1090,59 @@ async function fetchHibidLive() {
 
   for (const kw of kws) {
     try {
-      // Use /lots/ search URL — this returns individual lot pages not catalog pages
-      const searchUrl = `https://hibid.com/lots/0/all?q=${encodeURIComponent(kw)}&sort=enddate&online=true`;
-
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000); // 45 second timeout per keyword
+      const timeout = setTimeout(() => controller.abort(), 60000);
 
       const runRes = await fetch(
-        "https://api.apify.com/v2/acts/ecomscrape~hibid-auction-listings-scraper/run-sync-get-dataset-items?token=" + apifyToken + "&timeout=40&memory=512",
+        "https://api.apify.com/v2/acts/zcamper~hibidactor/run-sync-get-dataset-items?token=" + apifyToken + "&memory=512",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
-            start_urls: [{ url: searchUrl }],
-            max_items_per_url: 12,
-            max_retries_per_url: 1,
-            ignore_url_failures: true
+            searchKeywords: kw,
+            maxAuctions: 5,
+            maxLotsPerAuction: 10,
+            auctionStatus: "open"
           })
         }
       );
       clearTimeout(timeout);
 
-      if (!runRes.ok) { console.log("Apify error:", runRes.status, await runRes.text()); continue; }
-      const data = await runRes.json();
-
-      // Log first item so we can see the exact field names returned
-      if (Array.isArray(data) && data.length > 0) {
-        console.log("Apify fields for '" + kw + "':", Object.keys(data[0]));
-        console.log("Apify first item:", JSON.stringify(data[0], null, 2));
+      if (!runRes.ok) {
+        console.log("Apify error " + runRes.status + ":", await runRes.text());
+        continue;
       }
+      const data = await runRes.json();
+      console.log("Results for '" + kw + "':", data.length, "lots");
 
       (Array.isArray(data) ? data : []).forEach(item => {
-        const currentBid = parseFloat(
-          item.currentBid || item.current_bid || item.currentPrice ||
-          item.price || item.bid || item.highBid || 0
-        );
+        const currentBid = parseFloat(item.currentBid || 0);
         if (!currentBid || currentBid > maxPrice) return;
 
-        const buyerPremium = parseFloat(item.buyerPremium || item.buyer_premium || item.premium || 15);
+        // Per docs: buyer premium not in search results, default 15%
+        const buyerPremium = parseFloat(item.buyerPremium || 15);
         const totalCost = currentBid * (1 + buyerPremium / 100);
 
-        // Try every possible URL field — log will tell us which one is correct
-        const directUrl =
-          item.url || item.lotUrl || item.itemUrl || item.link ||
-          item.href || item.pageUrl || item.detailUrl ||
-          (item.lotId || item.id
-            ? `https://hibid.com/lot/${item.lotId || item.id}/${(item.title||'lot').toLowerCase().replace(/[^a-z0-9]+/g,'-').substring(0,40)}`
-            : "https://hibid.com");
+        // Per docs: direct lot URL is in field 'lotUrl'
+        // e.g. https://hibid.com/lot/284341083/minolta-x-700?ref=lot-list
+        const directUrl = item.lotUrl || item.auctionUrl || "https://hibid.com";
 
         all.push({
-          id: item.lotId || item.id || item.lot_id || Math.random().toString(36),
-          title: item.title || item.name || item.lotTitle || "Untitled Lot",
+          id: String(item.lotNumber || Math.random().toString(36)),
+          title: item.lotTitle || item.title || "Untitled Lot",
           currentBid, buyerPremium,
           sellEst: parseFloat((totalCost * 2.8).toFixed(2)),
-          auctionHouse: item.auctionHouse || item.company || item.seller || item.auctioneer || "Estate Auction",
-          ending: item.endDate || item.end_date || item.closeDate || item.endTime || "—",
+          auctionHouse: item.auctioneerName || item.auctionTitle || "Estate Auction",
+          ending: item.auctionEndDate || "—",
           url: directUrl,
+          img: (item.images && item.images[0]) || null,
           keyword: kw
         });
       });
     } catch(e) {
-      if (e.name === "AbortError") {
-        console.log("Timeout for keyword:", kw);
-      } else {
-        console.log("Apify error:", e);
-      }
+      if (e.name === "AbortError") console.log("Timeout for:", kw);
+      else console.log("Apify error:", e.message);
     }
   }
   return all.length ? all : HIBID_SAMPLE.filter(i => hibidActiveKW.has(i.keyword));
