@@ -607,6 +607,11 @@ async function fetchLive() {
       const data = await res.json();
       (data.itemSummaries || []).forEach(item => {
         const price = parseFloat(item.price?.value || 0);
+        // Build direct eBay item URL from itemId — more reliable than itemWebUrl
+        const itemId = item.itemId ? item.itemId.replace("v1|","").split("|")[0] : "";
+        const directUrl = itemId
+          ? `https://www.ebay.com/itm/${itemId}`
+          : (item.itemWebUrl || "https://www.ebay.com");
         all.push({
           id: item.itemId, title: item.title, price,
           sellEst: parseFloat((price * 2.8).toFixed(2)),
@@ -614,7 +619,7 @@ async function fetchLive() {
           format: item.buyingOptions?.includes("FIXED_PRICE") ? "BIN" : "Auction",
           ending: item.itemEndDate ? new Date(item.itemEndDate).toLocaleString() : "—",
           img: item.image?.imageUrl || null,
-          url: item.itemWebUrl, bids: item.bidCount || null, keyword: kw
+          url: directUrl, bids: item.bidCount || null, keyword: kw
         });
       });
     } catch(e) { console.log(e); }
