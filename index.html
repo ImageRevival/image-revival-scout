@@ -685,7 +685,7 @@ function renderResults(items) {
           <span style="font-size:11px;color:var(--text3);">${item.condition}</span>
         </div>
         <div class="card-actions">
-          <a class="btn btn-sm btn-ghost" href="${item.url}" target="_blank" rel="noopener">View on eBay ↗</a>
+          <button class="btn btn-sm btn-ghost" onclick="navTo(this)" data-url="${item.url}">View on eBay ↗</button>
           <button class="btn btn-sm ${watched?'btn-danger':'btn-watch'}" onclick="toggleWatch(${JSON.stringify(item).replace(/"/g,'&quot;')}, this)">
             ${watched ? '★ Watching' : '☆ Watch'}
           </button>
@@ -704,6 +704,12 @@ function renderResults(items) {
 }
 
 function openOnEbay(url) { window.open(url, "_blank"); }
+function navTo(btn) {
+  const url = btn.getAttribute("data-url");
+  if (url && url !== "https://www.ebay.com" && url !== "https://hibid.com") {
+    window.open(url, "_blank");
+  }
+}
 
 // ============================================================
 // WATCHLIST
@@ -761,7 +767,7 @@ function renderWatchlist() {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
-          <a class="btn btn-sm btn-ghost" href="${item.url}" target="_blank" rel="noopener">View on eBay ↗</a>
+          <button class="btn btn-sm btn-ghost" onclick="navTo(this)" data-url="${item.url}">View on eBay ↗</button>
           <button class="btn btn-sm btn-ghost" onclick="logFromWatch(${idx})">Log Purchase</button>
           <button class="btn btn-sm btn-danger" onclick="removeWatch(${idx})">Remove</button>
         </div>
@@ -1030,7 +1036,7 @@ function renderHibidResults(items) {
           <span style="font-size:11px;color:var(--text3);">${item.auctionHouse}</span>
         </div>
         <div class="card-actions">
-          <a class="btn btn-sm btn-ghost" href="${item.url}" target="_blank" rel="noopener">View on HiBid ↗</a>
+          <button class="btn btn-sm btn-ghost" onclick="navTo(this)" data-url="${item.url}">View on HiBid ↗</button>
           <button class="btn btn-sm ${watched?'btn-danger':'btn-watch'}" onclick="toggleWatch(${JSON.stringify({...item, format:'Auction', price: item._totalCost, condition:'Estate Auction'}).replace(/"/g,'&quot;')}, this)">
             ${watched ? '★ Watching' : '☆ Watch'}
           </button>
