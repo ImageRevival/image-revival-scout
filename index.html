@@ -597,23 +597,31 @@ async function fetchLive() {
   const max = document.getElementById("maxPrice").value || 65;
   const min = document.getElementById("minPrice").value || 5;
   const all = [];
+  const errors = [];
   for (const kw of Array.from(activeKW).slice(0, 5)) {
     try {
       const res = await fetch(
         `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(kw)}&filter=price:[${min}..${max}],priceCurrency:USD&sort=endingSoon&limit=10`,
         { headers: { "Authorization": `Bearer ${apiToken}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } }
       );
-      if (!res.ok) continue;
+      if (!res.ok) {
+        const txt = await res.text();
+        errors.push(`${kw}: ${res.status} — ${txt.substring(0,100)}`);
+        continue;
+      }
       const data = await res.json();
-      (data.itemSummaries || []).forEach(item => {
+      const items = data.itemSummaries || [];
+      console.log(`eBay '${kw}': ${items.length} results`);
+      if (items.length > 0) console.log("Sample URL:", items[0].itemWebUrl, "| itemId:", items[0].itemId);
+      items.forEach(item => {
         const price = parseFloat(item.price?.value || 0);
-        // Build direct eBay item URL from itemId — more reliable than itemWebUrl
-        const itemId = item.itemId ? item.itemId.replace("v1|","").split("|")[0] : "";
-        const directUrl = itemId
-          ? `https://www.ebay.com/itm/${itemId}`
-          : (item.itemWebUrl || "https://www.ebay.com");
+        const rawId = item.itemId || "";
+        // eBay itemId format is "v1|123456789|0" — extract the numeric part
+        const itemId = rawId.includes("|") ? rawId.split("|")[1] : rawId;
+        const directUrl = itemId ? `https://www.ebay.com/itm/${itemId}` : item.itemWebUrl;
+        console.log(`Built URL: ${directUrl}`);
         all.push({
-          id: item.itemId, title: item.title, price,
+          id: rawId, title: item.title, price,
           sellEst: parseFloat((price * 2.8).toFixed(2)),
           condition: item.condition || "Used",
           format: item.buyingOptions?.includes("FIXED_PRICE") ? "BIN" : "Auction",
@@ -622,7 +630,11 @@ async function fetchLive() {
           url: directUrl, bids: item.bidCount || null, keyword: kw
         });
       });
-    } catch(e) { console.log(e); }
+    } catch(e) { errors.push(`${kw}: ${e.message}`); }
+  }
+  if (errors.length) console.log("eBay errors:", errors);
+  if (!all.length) {
+    document.getElementById("notice").innerHTML += `<br><strong>No live results returned.</strong> Check console (F12) for details. Errors: ${errors.join(" | ") || "none — token may be expired"}`;
   }
   return all.length ? all : SAMPLE_DATA;
 }
@@ -1157,18 +1169,6 @@ async function fetchHibidLive() {
     }
   }
   return all.length ? all : HIBID_SAMPLE.filter(i => hibidActiveKW.has(i.keyword));
-}
-
-// ============================================================
-// SETTINGS
-// ============================================================
-function saveSettings() {
-  apiToken = document.getElementById("settingsApiKey").value.trim();
-  apifyToken = document.getElementById("settingsApifyKey").value.trim();
-  localStorage.setItem("ir_api_token", apiToken);
-  localStorage.setItem("ir_apify_token", apifyToken);
-  document.getElementById("settingsSaved").style.display = "block";
-  setTimeout(() => document.getElementById("settingsSaved").style.display = "none", 2000);
 }
 
 // ============================================================
