@@ -600,10 +600,19 @@ async function fetchLive() {
   const errors = [];
   for (const kw of Array.from(activeKW).slice(0, 5)) {
     try {
-      const res = await fetch(
-     `, const proxyUrl = "https://corsproxy.io/?url=" + encodeURIComponent(ebayUrl);
-        { headers: { "Authorization": `Bearer ${apiToken}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } }
-      );
+const ebayUrl = "https://svcs.ebay.com/services/search/FindingService/v1" +
+        "?OPERATION-NAME=findItemsAdvanced" +
+        "&SERVICE-VERSION=1.0.0" +
+        "&SECURITY-APPNAME=" + encodeURIComponent(apiToken) +
+        "&RESPONSE-DATA-FORMAT=JSON" +
+        "&keywords=" + encodeURIComponent(kw) +
+        "&itemFilter(0).name=MinPrice&itemFilter(0).value=" + min + "&itemFilter(0).paramName=Currency&itemFilter(0).paramValue=USD" +
+        "&itemFilter(1).name=MaxPrice&itemFilter(1).value=" + max + "&itemFilter(1).paramName=Currency&itemFilter(1).paramValue=USD" +
+        "&itemFilter(2).name=ListingType&itemFilter(2).value(0)=AuctionWithBIN&itemFilter(2).value(1)=FixedPrice&itemFilter(2).value(2)=Auction" +
+        "&sortOrder=EndTimeSoonest" +
+        "&paginationInput.entriesPerPage=10";
+      const proxyUrl = "https://corsproxy.io/?url=" + encodeURIComponent(ebayUrl);
+      const res = await fetch(proxyUrl);
       if (!res.ok) {
         const txt = await res.text();
         errors.push(`${kw}: ${res.status} — ${txt.substring(0,100)}`);
