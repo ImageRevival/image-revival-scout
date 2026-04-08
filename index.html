@@ -601,7 +601,7 @@ async function fetchLive() {
   for (const kw of Array.from(activeKW).slice(0, 5)) {
     try {
       const res = await fetch(
-        `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(kw)}&filter=price:[${min}..${max}],priceCurrency:USD&sort=endingSoon&limit=10`,
+     `, const proxyUrl = "https://corsproxy.io/?url=" + encodeURIComponent(ebayUrl);
         { headers: { "Authorization": `Bearer ${apiToken}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } }
       );
       if (!res.ok) {
